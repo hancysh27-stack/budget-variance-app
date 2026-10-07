@@ -1,0 +1,21 @@
+Department,Line_Item,Budget,Actual
+Marketing,Digital Ads,250000,355000.0
+Marketing,Events,300000,315000.0
+Marketing,Content Production,90000,98000.0
+Marketing,Agency Fees,110000,109000.0
+Sales,Travel,80000,50000.0
+Sales,Commissions,180000,167000.0
+Sales,CRM Licenses,320000,321000.0
+Sales,Training,200000,188000.0
+IT,Cloud Hosting,320000,419000.0
+IT,Software Licenses,410000,387000.0
+IT,Hardware,190000,199000.0
+IT,Support Contracts,420000,466000.0
+HR,Recruitment,410000,425000.0
+HR,Employee Welfare,80000,89000.0
+HR,Training,70000,72000.0
+HR,Payroll Software,130000,127000.0
+Operations,Logistics,140000,144000.0
+Operations,Utilities,410000,402000.0
+Operations,Maintenance,480000,459000.0
+Operations,Office Supplies,420000,434000.0
