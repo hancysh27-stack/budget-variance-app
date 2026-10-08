@@ -93,6 +93,15 @@ def get_api_key() -> str:
     return st.sidebar.text_input("Gemini API key (optional)", type="password")
 
 
+def clean(df: pd.DataFrame):
+    """Convert Budget/Actual to numbers and drop unusable rows."""
+    df = df.copy()
+    for c in ["Budget", "Actual"]:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    bad = df[REQUIRED_COLS].isna().any(axis=1) | (df["Budget"] <= 0)
+    return df[~bad].reset_index(drop=True), int(bad.sum())
+
+
 # ---------- UI ----------
 st.title("📊 Budget Variance Analyzer")
 st.caption("Upload actuals vs budget → get variances, top outliers and AI-written commentary.")
@@ -113,6 +122,19 @@ if uploaded:
 else:
     raw = load_sample()
     st.info("Showing built-in sample data. Upload your own CSV from the sidebar.")
+
+raw, n_bad = clean(raw)
+if n_bad:
+    st.warning(f"{n_bad} row(s) skipped: blank, non-numeric, or zero/negative budget values.")
+if raw.empty:
+    st.error("No valid rows found. Check that Budget and Actual contain numbers.")
+    st.stop()
+
+# Reset saved commentary whenever the data changes
+sig = int(pd.util.hash_pandas_object(raw, index=False).sum())
+if st.session_state.get("sig") != sig:
+    st.session_state["sig"] = sig
+    st.session_state.pop("commentary", None)
 
 data = analyze(raw, threshold)
 outliers = top_outliers(data)
@@ -155,20 +177,37 @@ st.dataframe(
 
 # Commentary
 st.subheader("🤖 Variance commentary")
+st.caption(
+    "Privacy: clicking Generate sends a summary (totals, department totals and the top 3 "
+    "outlier rows) to Google's Gemini API. Do not upload confidential data."
+)
 if st.button("Generate commentary", type="primary"):
     with st.spinner("Analyzing..."):
         if api_key:
             try:
-                st.markdown(ai_commentary(data, outliers, api_key).replace("$", "\\$"))
+                text = ai_commentary(data, outliers, api_key).replace("$", "\\$")
+                st.session_state["commentary"] = ("ai", text, "")
             except Exception as e:
                 detail = ""
                 if getattr(e, "response", None) is not None:
                     detail = f"{e.response.status_code}"
-                st.warning(f"AI call failed ({type(e).__name__} {detail}). Showing rule-based commentary instead.")
-                st.text(rule_based_commentary(data, outliers))
+                msg = f"AI call failed ({type(e).__name__} {detail}). Showing rule-based commentary instead."
+                st.session_state["commentary"] = ("fallback", msg, rule_based_commentary(data, outliers))
         else:
-            st.caption("No API key provided — using rule-based commentary.")
-            st.text(rule_based_commentary(data, outliers))
+            msg = "No API key provided — using rule-based commentary."
+            st.session_state["commentary"] = ("nokey", msg, rule_based_commentary(data, outliers))
+
+saved = st.session_state.get("commentary")
+if saved:
+    kind, text, extra = saved
+    if kind == "ai":
+        st.markdown(text)
+    else:
+        if kind == "fallback":
+            st.warning(text)
+        else:
+            st.caption(text)
+        st.text(extra)
     st.caption("AI text is a draft. Verify reasons with department owners before acting.")
 
 with st.expander("Full data table"):
